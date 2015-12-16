@@ -1,9 +1,10 @@
 buildscript {
     repositories {
         maven { url 'http://repo.spring.io/plugins-release' }
+        jcenter()
     }
     dependencies {
-        classpath 'org.springframework.build.gradle:docbook-reference-plugin:0.2.8'
+        classpath 'org.asciidoctor:asciidoctor-gradle-plugin:1.5.0'
         classpath 'me.champeau.gradle:gradle-javadoc-hotfix-plugin:0.1'
     }
 }
@@ -44,13 +45,6 @@ configure(allprojects) {
         testCompile "org.mockito:mockito-all:$mockitoVersion"
         testCompile "org.springframework:spring-test:$springVersion"
     }
-
-    // servlet-api (2.5) and tomcat-servlet-api (3.0) classpath entries should not be
-    // exported to dependent projects in Eclipse to avoid false compilation errors due
-    // to changing APIs across these versions
-    eclipse.classpath.file.whenMerged { classpath ->
-        classpath.entries.findAll { entry -> entry.path.contains('servlet-api') }*.exported = false
-    }
 }
 
 project('spring-social-watson') {
@@ -70,14 +64,21 @@ project('spring-social-watson') {
 configure(rootProject) {
     description = 'Spring Social Watson'
 
-    apply plugin: 'docbook-reference'
+    apply plugin: 'org.asciidoctor.gradle.asciidoctor'
 
-    reference {
-        sourceDir = file('src/reference/docbook')
+    asciidoctor {
+        sourceDir = new File("src/reference/asciidoc")
+        outputDir = new File("$buildDir/docs")
+        options = [
+                doctype: 'book',
+                attributes: [
+                        'source-highlighter': 'coderay',
+                        toc                 : '',
+                        idprefix            : '',
+                        idseparator         : '-'
+                ]
+        ]
     }
-
-    // don't publish the default jar for the root project
-    configurations.archives.artifacts.clear()
 
     dependencies { // for integration tests
     }
@@ -100,6 +101,7 @@ configure(rootProject) {
         classpath = files(subprojects.collect { project ->
             project.sourceSets.main.compileClasspath
         })
+
         maxMemory = '1024m'
     }
 
@@ -107,95 +109,22 @@ configure(rootProject) {
         group = 'Distribution'
         classifier = 'docs'
         description = "Builds -${classifier} archive containing api and reference " +
-            "for deployment at static.springframework.org/spring-social/docs."
+                "for deployment."
 
         from('src/dist') {
             include 'changelog.txt'
         }
 
-        from (api) {
+        from(api) {
             into 'api'
         }
-
-        from (reference) {
-            into 'reference'
-        }
-    }
-
-    task schemaZip(type: Zip) {
-        group = 'Distribution'
-        classifier = 'schema'
-        description = "Builds -${classifier} archive containing all " +
-            "XSDs for deployment at static.springframework.org/schema."
-
-        subprojects.each { subproject ->
-            def Properties schemas = new Properties();
-
-            subproject.sourceSets.main.resources.find {
-                it.path.endsWith('META-INF/spring.schemas')
-            }?.withInputStream { schemas.load(it) }
-
-            for (def key : schemas.keySet()) {
-                def shortName = key.replaceAll(/http.*schema.(.*).spring-.*/, '$1')
-                assert shortName != key
-                File xsdFile = subproject.sourceSets.main.resources.find {
-                    it.path.endsWith(schemas.get(key))
-                }
-                assert xsdFile != null
-                into (shortName) {
-                    from xsdFile.path
-                }
-            }
-        }
-    }
-
-    task distZip(type: Zip, dependsOn: [docsZip, schemaZip]) {
-        group = 'Distribution'
-        classifier = 'dist'
-        description = "Builds -${classifier} archive, containing all jars and docs, " +
-                      "suitable for community download page."
-
-        ext.baseDir = "${project.name}-${project.version}";
-
-        from('src/dist') {
-            include 'readme.txt'
-            include 'license.txt'
-            include 'notice.txt'
-            into "${baseDir}"
-            expand(copyright: new Date().format('yyyy'), version: project.version)
-        }
-
-        from(zipTree(docsZip.archivePath)) {
-            into "${baseDir}/docs"
-        }
-
-        from(zipTree(schemaZip.archivePath)) {
-            into "${baseDir}/schema"
-        }
-
-        subprojects.each { subproject ->
-            into ("${baseDir}/libs") {
-                from subproject.jar
-                if (subproject.tasks.findByPath('sourcesJar')) {
-                    from subproject.sourcesJar
-                }
-                if (subproject.tasks.findByPath('javadocJar')) {
-                    from subproject.javadocJar
-                }
-            }
-        }
-    }
-
-    artifacts {
-        archives docsZip
-//        archives schemaZip
-        archives distZip
     }
 
     task wrapper(type: Wrapper) {
         description = 'Generates gradlew[.bat] scripts'
         gradleVersion = '2.8'
     }
+
 }
 
 task updateRootDocs << {
