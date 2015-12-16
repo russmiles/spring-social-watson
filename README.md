@@ -16,5 +16,12 @@ You will need to obtain separate service credentials for each of the IBM Watson 
  
 * [Instructions for getting credentials for IBM Watson Services through IBM Bluemix](https://www.ibm.com/smarterplanet/us/en/ibmwatson/developercloud/doc/getting_started/gs-credentials.shtml)
 
+## To execute 'Smoke Test' status checked against the IBM Watson services
+
+It's a little bit of a hack but there is a way of inspecting the current status of the hosted IBM Watson services. We've added this to a collection of tests that can be run using:
+
+ ./gradlew smokeTest
+ 
+ 
 
 

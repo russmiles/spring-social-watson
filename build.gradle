@@ -6,6 +6,7 @@ buildscript {
     dependencies {
         classpath 'org.asciidoctor:asciidoctor-gradle-plugin:1.5.0'
         classpath 'me.champeau.gradle:gradle-javadoc-hotfix-plugin:0.1'
+        classpath 'com.ibm.watson.developer_cloud:java-sdk:2.3.0'
     }
 }
 
@@ -32,6 +33,22 @@ configure(allprojects) {
     [compileJava, compileTestJava]*.options*.compilerArgs = ['-Xlint:none']
 
     sourceSets.test.resources.srcDirs = ['src/test/resources', 'src/test/java']
+
+    sourceSets {
+        smokeTest {
+            java {
+                compileClasspath += main.output + test.output
+                runtimeClasspath += main.output + test.output
+                srcDir file('src/smoke-test/java')
+            }
+            resources.srcDir file('src/smoke-test/resources')
+        }
+    }
+
+    configurations {
+        smokeTestCompile.extendsFrom testCompile
+        smokeTestRuntime.extendsFrom testRuntime
+    }
 
     test.systemProperty("java.awt.headless", "true")
 
@@ -120,11 +137,19 @@ configure(rootProject) {
         }
     }
 
+    task smokeTest(type: Test) {
+        testClassesDir = sourceSets.smokeTest.output.classesDir
+        classpath = sourceSets.smokeTest.runtimeClasspath
+    }
+
+    tasks.withType(Test) {
+        reports.html.destination = file("${reporting.baseDir}/${name}")
+    }
+
     task wrapper(type: Wrapper) {
         description = 'Generates gradlew[.bat] scripts'
         gradleVersion = '2.8'
     }
-
 }
 
 task updateRootDocs << {
